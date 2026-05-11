@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>恐龙塔防 · 保卫萝卜</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      background: linear-gradient(180deg, #87ceeb 0%, #c8e6c9 45%, #8d6e63 100%);
+      font-family: "Microsoft YaHei", sans-serif;
+      padding: 8px;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    h1 { margin: 0 0 4px; font-size: 1.2rem; color: #1b5e20; }
+    .hint { font-size: 0.8rem; color: #333; margin-bottom: 6px; text-align: center; max-width: 100%; padding: 0 6px; line-height: 1.4; }
+    #wrap { position: relative; border: 4px solid #33691e; border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,.25); max-width: 100%; }
+    canvas { display: block; cursor: crosshair; width: 100%; height: auto; touch-action: none; }
+    .bar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      margin-top: 8px;
+      font-size: 0.85rem;
+      width: 100%;
+      max-width: 640px;
+    }
+    .tag { background: #fff; padding: 5px 10px; border-radius: 20px; border: 2px solid #558b2f; font-size: 0.8rem; }
+    .toolbar {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      margin-top: 6px;
+      width: 100%;
+      max-width: 640px;
+    }
+    .toolbtn {
+      padding: 10px 12px;
+      border: 2px solid #8d6e63;
+      border-radius: 20px;
+      background: #efebe9;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-family: inherit;
+      transition: all .15s;
+      touch-action: manipulation;
+      min-width: 52px;
+      text-align: center;
+    }
+    .toolbtn:hover { background: #d7ccc8; }
+    .toolbtn.active { background: #558b2f; color: #fff; border-color: #33691e; }
+    .toolbtn .keyhint { font-size: 0.65rem; opacity: 0.6; display: block; margin-top: 1px; }
+    .toolbtn.active .keyhint { opacity: 0.85; }
+
+    /* 胜利弹窗 */
+    #victoryOverlay {
+      display: none;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    #victoryOverlay.show { display: flex; }
+    #victoryBox {
+      background: linear-gradient(135deg, #fff8e1, #fff3e0);
+      border: 3px solid #ff8f00;
+      border-radius: 16px;
+      padding: 32px 28px;
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 12px 40px rgba(0,0,0,.3);
+    }
+    #victoryBox h2 { margin: 0 0 8px; font-size: 1.5rem; color: #e65100; }
+    #victoryBox p { margin: 0 0 16px; font-size: 0.9rem; color: #555; }
+    #victoryBox input {
+      display: block;
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 1rem;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 12px;
+      font-family: inherit;
+      outline: none;
+    }
+    #victoryBox input:focus { border-color: #ff8f00; }
+    #victoryBox button {
+      background: #ff8f00;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 24px;
+      font-size: 1rem;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #victoryBox button:hover { background: #e65100; }
+    #winnerList {
+      margin-top: 16px;
+      text-align: left;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    #winnerList h3 { font-size: 0.9rem; color: #795548; margin: 0 0 6px; text-align: center; }
+    #winnerList .winner-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 8px;
+      font-size: 0.85rem;
+      border-bottom: 1px solid #eee;
+    }
+    #winnerList .winner-item:last-child { border: none; }
+    .winner-name { color: #333; font-weight: bold; }
+    .winner-date { color: #999; font-size: 0.75rem; }
+
+    @media (max-width: 500px) {
+      .toolbtn { padding: 8px 8px; font-size: 0.75rem; min-width: 44px; }
+      .tag { font-size: 0.7rem; padding: 4px 8px; }
+      h1 { font-size: 1rem; }
+      .hint { font-size: 0.7rem; }
+    }
+  </style>
+</head>
+<body>
+  <h1>恐龙塔防 · 保卫萝卜</h1>
+  <p class="hint">炮塔占格子、恐龙绕路走；陷阱放路上自动触发，不占格子。<br/>炮塔分3种：普通塔20g、激光塔60g、雷塔100g(只打飞行怪)。<br/>陷阱4种：地刺30g(可升级)、捕兽夹30g(减速地面怪)、飞网30g(减速飞行怪)、地雷20g(10%最大生命值)。<br/>每3只出1快速红怪(30g)，每5只出1紫色翼龙(30g)。每波递增速度，每波通过+300金，每10秒难度提升。<br/>点击塔/地刺可花20金升级，击杀5次或助攻10次自动升1级。<br/>按8或用拆除工具点击塔/陷阱可拆除（不返金币），地块可重新使用。<br/>出生血量&lt;1000时每10秒+50%，&lt;10000时+40%，之后+10%，上限20万。达到上限后通关胜利！</p>
+  <div id="wrap">
+    <canvas id="game" width="640" height="480"></canvas>
+  </div>
+  <div class="bar">
+    <span class="tag" id="carrotTag">萝卜：安全</span>
+    <span class="tag" id="goldTag">金币：120</span>
+    <span class="tag" id="waveTag">波次：1</span>
+    <span class="tag" id="diffTag">10秒难度：新兵多0血 · 每波多0只</span>
+  </div>
+  <div class="toolbar" id="toolbar">
+    <button class="toolbtn active" data-tool="normal">炮塔 <span class="keyhint">1</span></button>
+    <button class="toolbtn" data-tool="laser">激光 <span class="keyhint">2</span></button>
+    <button class="toolbtn" data-tool="lightning">雷塔 <span class="keyhint">3</span></button>
+    <button class="toolbtn" data-tool="spike">地刺 <span class="keyhint">4</span></button>
+    <button class="toolbtn" data-tool="trap">夹子 <span class="keyhint">5</span></button>
+    <button class="toolbtn" data-tool="net">飞网 <span class="keyhint">6</span></button>
+    <button class="toolbtn" data-tool="mine">地雷 <span class="keyhint">7</span></button>
+    <button class="toolbtn" data-tool="remove">拆除 <span class="keyhint">8</span></button>
+  </div>
+
+  <!-- 胜利弹窗 -->
+  <div id="victoryOverlay">
+    <div id="victoryBox">
+      <h2>胜利！</h2>
+      <p>你成功抵御了所有恐龙攻击！<br/>请输入你的名字记录成绩：</p>
+      <input id="nameInput" type="text" placeholder="输入名字..." maxlength="12" />
+      <button id="submitBtn">提交记录</button>
+      <div style="margin-top: 8px;"><button id="clearBtn" style="background:transparent;color:#999;border:1px solid #ddd;border-radius:6px;padding:4px 12px;font-size:0.75rem;cursor:pointer;font-family:inherit;">清除记录</button></div>
+      <div id="winnerList"></div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+
+    const COLS = 16;
+    const ROWS = 12;
+    const CELL = 40;
+    const START = { gx: 0, gy: 5 };
+    const GOAL = { gx: 15, gy: 5 };
+
+    const BASE_DAMAGE = 20;
+    const DINO_HP = 100;
+    const DINO_HP_MAX = 200000;
+    const TOWER_RANGE = 88;
+    const TOWER_COST = 20;
+    const LASER_TOWER_COST = 60;
+    const LIGHTNING_TOWER_COST = 100;
+    const LASER_RANGE_MULTIPLIER = 1.5;
+    const LASER_DAMAGE_MULTIPLIER = 1.5;
+    const BULLET_SPEED = 7;
+    const FIRE_COOLDOWN_MS = 450;
+    const KILLS_PER_LEVEL = 5;
+    const ASSISTS_PER_LEVEL = 10;
+    const GOLD_PER_KILL = 10;
+    const UPGRADE_COST = 20;
+    const MAX_TOWER_LEVEL = 99;
+    const DINO_HP_BOOST_EVERY_MS = 10000;
+
+    // 陷阱系统
+    const SPIKE_COST = 30;
+    const TRAP_COST = 30;
+    const NET_COST = 30;
+    const MINE_COST = 20;
+    const SPIKE_DAMAGE = 50;
+    const SLOW_FACTOR = 0.5;
+    const SPIKE_COOLDOWN_MS = 500;
+    let selectedTool = "normal"; // "normal" | "laser" | "lightning" | "spike" | "trap" | "net" | "mine" | "remove"
+    let traps = [];
+
+    function baseSpawnForWave(w) {
+      return w === 1 ? 5 : 4 + w * 2;
+    }
+
+    function key(gx, gy) {
+      return gx + "," + gy;
+    }
+
+    function cellCenter(gx, gy) {
+      return { x: gx * CELL + CELL / 2, y: gy * CELL + CELL / 2 };
+    }
+
+    function bfs(sx, sy, tgx, tgy, blocked) {
+      const sk = key(sx, sy);
+      const gk = key(tgx, tgy);
+      if (blocked.has(sk) || blocked.has(gk)) return null;
+      const q = [[sx, sy]];
+      const parent = new Map([[sk, null]]);
+      const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      while (q.length) {
+        const [cx, cy] = q.shift();
+        if (cx === tgx && cy === tgy) {
+          const path = [];
+          let cur = gk;
+          while (cur != null) {
+            const [px, py] = cur.split(",").map(Number);
+            path.push({ gx: px, gy: py });
+            cur = parent.get(cur);
+          }
+          path.reverse();
+          return path;
+        }
+        for (const [dx, dy] of dirs) {
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) continue;
+          const nk = key(nx, ny);
+          if (parent.has(nk)) continue;
+          if (blocked.has(nk)) continue;
+          parent.set(nk, key(cx, cy));
+          q.push([nx, ny]);
+        }
+      }
+      return null;
+    }
+
+    function getBlockedSet() {
+      const s = new Set();
+      for (const t of towers) s.add(key(t.gx, t.gy));
+      return s;
+    }
+
+    function towerAt(gx, gy) {
+      return towers.some((t) => t.gx === gx && t.gy === gy);
+    }
+
+    function repathEnemy(e) {
+      const blocked = e.isFlying ? new Set() : getBlockedSet();
+      let egx = Math.floor(e.x / CELL);
+      let egy = Math.floor(e.y / CELL);
+      egx = Math.max(0, Math.min(COLS - 1, egx));
+      egy = Math.max(0, Math.min(ROWS - 1, egy));
+      const pathCells = bfs(egx, egy, GOAL.gx, GOAL.gy, blocked);
+      if (!pathCells || pathCells.length < 1) return;
+      e.pathCells = pathCells;
+      e.waypointIdx = pathCells.length >= 2 ? 1 : 0;
+      while (e.waypointIdx < pathCells.length) {
+        const p = pathCells[e.waypointIdx];
+        const w = cellCenter(p.gx, p.gy);
+        if (dist(e, w) < 8) e.waypointIdx++;
+        else break;
+      }
+    }
+
+    function towerDamage(level) {
+      if (level <= 10) {
+        return BASE_DAMAGE + (level - 1) * 20;
+      }
+      if (level <= 20) {
+        return 200 + (level - 10) * 40;
+      }
+      return 600 + (level - 20) * 60;
+    }
+
+    function towerRange(t) {
+      if (t.type === "laser" || t.type === "lightning") return TOWER_RANGE * LASER_RANGE_MULTIPLIER;
+      return TOWER_RANGE;
+    }
+
+    function towerAttackDamage(t) {
+      const base = towerDamage(t.level);
+      if (t.type === "lightning") return Math.round(base * LASER_DAMAGE_MULTIPLIER * 2);
+      return t.type === "laser" ? Math.round(base * LASER_DAMAGE_MULTIPLIER) : base;
+    }
+
+    let gold = 120;
+    let wave = 1;
+    let towers = [];
+    let enemies = [];
+    let bullets = [];
+    let laserBeams = [];
+    let lightningBolts = [];
+    let spawnTimer = 0;
+    let toSpawnThisWave = 5;
+    let spawnedThisWave = 0;
+    let prevFrameTs = 0;
+    let difficultyTimer = 0;
+    let spawnBonus = 0;
+    let extraDinoSpawnHp = 0;
+    let gameLost = false;
+    let gameWon = false;
+    const STORAGE_KEY = "td_winners";
+    let spawnSpeedFactor = 1.0;
+    let mouseCell = null;
+    let hoveredTower = null;
+
+    function dist(a, b) {
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      return Math.hypot(dx, dy);
+    }
+
+    function canPlaceTowerAt(gx, gy) {
+      if ((gx === START.gx && gy === START.gy) || (gx === GOAL.gx && gy === GOAL.gy)) return false;
+      if (towerAt(gx, gy)) return false;
+      const blocked = getBlockedSet();
+      blocked.add(key(gx, gy));
+      if (!bfs(START.gx, START.gy, GOAL.gx, GOAL.gy, blocked)) return false;
+      for (const e of enemies) {
+        if (e.isFlying) continue;
+        let egx = Math.floor(e.x / CELL);
+        let egy = Math.floor(e.y / CELL);
+        egx = Math.max(0, Math.min(COLS - 1, egx));
+        egy = Math.max(0, Math.min(ROWS - 1, egy));
+        if (!bfs(egx, egy, GOAL.gx, GOAL.gy, blocked)) return false;
+      }
+      return true;
+    }
+
+    function placeTower(gx, gy) {
+      if (gameLost) return;
+      if (gold < TOWER_COST) return;
+      if (gx < 0 || gx >= COLS || gy < 0 || gy >= ROWS) return;
+      if (!canPlaceTowerAt(gx, gy)) return;
+      const c = cellCenter(gx, gy);
+      gold -= TOWER_COST;
+      towers.push({
+        gx,
+        gy,
+        x: c.x,
+        y: c.y,
+        type: "normal",
+        level: 1,
+        kills: 0,
+        assists: 0,
+        cooldown: 0,
+      });
+      for (const e of enemies) repathEnemy(e);
+    }
+
+    function placeLaserTower(gx, gy) {
+      if (gameLost) return;
+      if (gold < LASER_TOWER_COST) return;
+      if (gx < 0 || gx >= COLS || gy < 0 || gy >= ROWS) return;
+      if (!canPlaceTowerAt(gx, gy)) return;
+      const c = cellCenter(gx, gy);
+      gold -= LASER_TOWER_COST;
+      towers.push({
+        gx,
+        gy,
+        x: c.x,
+        y: c.y,
+        type: "laser",
+        level: 1,
+        kills: 0,
+        assists: 0,
+        cooldown: 0,
+      });
+      for (const e of enemies) repathEnemy(e);
+    }
+
+    function placeLightningTower(gx, gy) {
+      if (gameLost) return;
+      if (gold < LIGHTNING_TOWER_COST) return;
+      if (gx < 0 || gx >= COLS || gy < 0 || gy >= ROWS) return;
+      if (!canPlaceTowerAt(gx, gy)) return;
+      const c = cellCenter(gx, gy);
+      gold -= LIGHTNING_TOWER_COST;
+      towers.push({
+        gx,
+        gy,
+        x: c.x,
+        y: c.y,
+        type: "lightning",
+        level: 1,
+        kills: 0,
+        assists: 0,
+        cooldown: 0,
+      });
+      for (const e of enemies) repathEnemy(e);
+    }
+
+    function upgradeTower(tower) {
+      if (gameLost) return;
+      if (tower.level >= MAX_TOWER_LEVEL) return;
+      if (gold < UPGRADE_COST) return;
+      gold -= UPGRADE_COST;
+      tower.level++;
+      tower.upgradedAt = performance.now();
+    }
+
+    function nearestEnemyInRange(tower) {
+      const range = towerRange(tower);
+      let best = null;
+      let bestD = Infinity;
+      for (const e of enemies) {
+        if (tower.type === "lightning" && !e.isFlying) continue;
+        if (tower.type !== "lightning" && e.isFlying) continue;
+        const d = dist(tower, e);
+        if (d <= range && d < bestD) {
+          bestD = d;
+          best = e;
+        }
+      }
+      return best;
+    }
+
+    // ========== 陷阱系统 ==========
+
+    function getPathCells() {
+      const blocked = getBlockedSet();
+      const path = bfs(START.gx, START.gy, GOAL.gx, GOAL.gy, blocked);
+      return path ? path.map(p => key(p.gx, p.gy)) : [];
+    }
+
+    function trapAt(gx, gy) {
+      return traps.find(t => t.gx === gx && t.gy === gy);
+    }
+
+    function canPlaceTrapAt(gx, gy) {
+      if (gx < 0 || gx >= COLS || gy < 0 || gy >= ROWS) return false;
+      if (gx === START.gx && gy === START.gy) return false;
+      if (gx === GOAL.gx && gy === GOAL.gy) return false;
+      if (towerAt(gx, gy)) return false;
+      if (trapAt(gx, gy)) return false;
+      return true;
+    }
+
+    function placeTrap(gx, gy, type) {
+      if (gameLost) return;
+      const costs = { spike: SPIKE_COST, trap: TRAP_COST, net: NET_COST, mine: MINE_COST };
+      if (gold < costs[type]) return;
+      if (!canPlaceTrapAt(gx, gy)) return;
+      gold -= costs[type];
+      const trapObj = { gx, gy, type };
+      if (type === "spike") {
+        trapObj.level = 1;
+        trapObj.kills = 0;
+        trapObj.assists = 0;
+        trapObj.damagedBy = new Set();
+        trapObj.cooldown = 0;
+        trapObj.upgradedAt = 0;
+      }
+      traps.push(trapObj);
+    }
+
+    function upgradeTrap(trap) {
+      if (trap.type !== "spike") return;
+      if (trap.level >= MAX_TOWER_LEVEL) return;
+      if (gold < UPGRADE_COST) return;
+      gold -= UPGRADE_COST;
+      trap.level++;
+      trap.upgradedAt = performance.now();
+    }
+
+    function removeTowerAt(gx, gy) {
+      towers = towers.filter(t => t.gx !== gx || t.gy !== gy);
+      for (const e of enemies) repathEnemy(e);
+    }
+
+    function removeTrapAt(gx, gy) {
+      traps = traps.filter(t => t.gx !== gx || t.gy !== gy);
+    }
+
+    function trapDamage(trap) {
+      if (trap.type !== "spike") return 0;
+      const fn = towerDamage;
+      return fn(trap.level);
+    }
+
+    function processSpikeKill(enemy, spike) {
+      if (enemy.dead) return;
+      enemy.dead = true;
+      const mult = enemy.isFast ? 2 : 1;
+      spike.kills += mult;
+      while (spike.kills >= KILLS_PER_LEVEL) {
+        spike.kills -= KILLS_PER_LEVEL;
+        spike.level++;
+      }
+      gold += GOLD_PER_KILL * (enemy.isFast || enemy.isFlying ? 3 : 1);
+      for (const assistTw of enemy.damagedBy) {
+        if (assistTw !== spike) {
+          assistTw.assists += mult;
+          while (assistTw.assists >= ASSISTS_PER_LEVEL) {
+            assistTw.assists -= ASSISTS_PER_LEVEL;
+            assistTw.level++;
+          }
+        }
+      }
+    }
+
+    function processDeath(enemy, killer) {
+      if (enemy.dead) return;
+      enemy.dead = true;
+      const mult = enemy.isFast ? 2 : 1;
+      killer.kills += mult;
+      while (killer.kills >= KILLS_PER_LEVEL) {
+        killer.kills -= KILLS_PER_LEVEL;
+        killer.level++;
+      }
+      gold += GOLD_PER_KILL * (enemy.isFast || enemy.isFlying ? 3 : 1);
+      for (const assistTw of enemy.damagedBy) {
+        if (assistTw !== killer) {
+          assistTw.assists += mult;
+          while (assistTw.assists >= ASSISTS_PER_LEVEL) {
+            assistTw.assists -= ASSISTS_PER_LEVEL;
+            assistTw.level++;
+          }
+        }
+      }
+    }
+
+    function spawnEnemy() {
+      const blocked = getBlockedSet();
+      const isFast = spawnedThisWave > 0 && spawnedThisWave % 3 === 2;
+      const isFlying = spawnedThisWave > 0 && spawnedThisWave % 5 === 4;
+      const pathCells = bfs(START.gx, START.gy, GOAL.gx, GOAL.gy, isFlying ? new Set() : blocked);
+      if (!pathCells || pathCells.length < 1) return;
+      const startC = cellCenter(START.gx, START.gy);
+      const spawnHp = Math.min(DINO_HP_MAX, DINO_HP + extraDinoSpawnHp);
+      const baseSpeed = 38 * Math.pow(1.1, wave - 1);
+      enemies.push({
+        x: startC.x,
+        y: startC.y,
+        hp: isFlying ? Math.round(spawnHp * 0.3) : spawnHp,
+        maxHp: isFlying ? Math.round(spawnHp * 0.3) : spawnHp,
+        speed: isFast ? baseSpeed * 1.5 : baseSpeed,
+        isFast,
+        isFlying,
+        pathCells,
+        waypointIdx: pathCells.length >= 2 ? 1 : 0,
+        touchedCarrot: false,
+        damagedBy: new Set(),
+      });
+    }
+
+    function updateEnemy(e, dt) {
+      const g = cellCenter(GOAL.gx, GOAL.gy);
+      if (dist(e, g) < CELL * 0.42) {
+        e.touchedCarrot = true;
+        return;
+      }
+      if (!e.pathCells || e.pathCells.length === 0) return;
+      if (e.waypointIdx >= e.pathCells.length) {
+        e.touchedCarrot = true;
+        return;
+      }
+      const wp = e.pathCells[e.waypointIdx];
+      const tx = wp.gx * CELL + CELL / 2;
+      const ty = wp.gy * CELL + CELL / 2;
+      const dx = tx - e.x;
+      const dy = ty - e.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const step = ((e.snaredTimer > 0 ? e.speed * SLOW_FACTOR : e.speed) * dt) / 1000;
+      if (e.snaredTimer > 0) e.snaredTimer -= dt;
+      if (step >= len) {
+        e.x = tx;
+        e.y = ty;
+        e.waypointIdx++;
+        if (e.waypointIdx >= e.pathCells.length) e.touchedCarrot = true;
+      } else {
+        e.x += (dx / len) * step;
+        e.y += (dy / len) * step;
+      }
+    }
+
+    function drawGrid() {
+      for (let gy = 0; gy < ROWS; gy++) {
+        for (let gx = 0; gx < COLS; gx++) {
+          ctx.fillStyle = (gx + gy) % 2 === 0 ? "#c8e6c9" : "#a5d6a7";
+          ctx.fillRect(gx * CELL, gy * CELL, CELL, CELL);
+        }
+      }
+      ctx.strokeStyle = "rgba(0,0,0,.15)";
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= COLS; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * CELL + 0.5, 0);
+        ctx.lineTo(i * CELL + 0.5, ROWS * CELL);
+        ctx.stroke();
+      }
+      for (let j = 0; j <= ROWS; j++) {
+        ctx.beginPath();
+        ctx.moveTo(0, j * CELL + 0.5);
+        ctx.lineTo(COLS * CELL, j * CELL + 0.5);
+        ctx.stroke();
+      }
+    }
+
+    function drawStart() {
+      const { x, y } = cellCenter(START.gx, START.gy);
+      ctx.fillStyle = "rgba(100, 181, 246, 0.45)";
+      ctx.fillRect(START.gx * CELL + 2, START.gy * CELL + 2, CELL - 4, CELL - 4);
+      ctx.fillStyle = "#1565c0";
+      ctx.font = "bold 11px Microsoft YaHei";
+      ctx.textAlign = "center";
+      ctx.fillText("起点", x, y + 4);
+    }
+
+    function drawCarrot() {
+      const { x, y } = cellCenter(GOAL.gx, GOAL.gy);
+      ctx.save();
+      ctx.translate(x, y + 2);
+      ctx.fillStyle = "#ff9800";
+      ctx.beginPath();
+      ctx.moveTo(0, 14);
+      ctx.lineTo(-11, -6);
+      ctx.lineTo(11, -6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#ffb74d";
+      ctx.beginPath();
+      ctx.moveTo(0, 6);
+      ctx.lineTo(-5, -4);
+      ctx.lineTo(5, -4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#66bb6a";
+      ctx.beginPath();
+      ctx.ellipse(0, -8, 9, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#2e7d32";
+      ctx.beginPath();
+      ctx.moveTo(0, -10);
+      ctx.lineTo(-4, -18);
+      ctx.lineTo(0, -14);
+      ctx.lineTo(4, -18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = "#e65100";
+      ctx.font = "bold 11px Microsoft YaHei";
+      ctx.textAlign = "center";
+      ctx.fillText("萝卜", x, GOAL.gy * CELL + CELL - 4);
+    }
+
+    function drawDino(e) {
+      let facing = 0;
+      if (e.waypointIdx < e.pathCells.length) {
+        const wp = e.pathCells[e.waypointIdx];
+        const tx = wp.gx * CELL + CELL / 2;
+        const ty = wp.gy * CELL + CELL / 2;
+        facing = Math.atan2(ty - e.y, tx - e.x);
+      } else {
+        const g = cellCenter(GOAL.gx, GOAL.gy);
+        facing = Math.atan2(g.y - e.y, g.x - e.x);
+      }
+
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.rotate(facing);
+
+      if (e.isFlying) {
+        // 翼龙 - 暗紫色调
+        // 身体发光效果
+        ctx.shadowColor = "rgba(156, 39, 176, 0.3)";
+        ctx.shadowBlur = 8;
+
+        // 翅膀膜（后层）
+        ctx.fillStyle = "rgba(106, 27, 154, 0.35)";
+        ctx.beginPath();
+        ctx.moveTo(-2, -4);
+        ctx.lineTo(10, -20);
+        ctx.lineTo(-10, -18);
+        ctx.lineTo(-6, -3);
+        ctx.closePath();
+        ctx.fill();
+
+        // 尾
+        ctx.fillStyle = "#6a1b9a";
+        ctx.beginPath();
+        ctx.moveTo(-6, 0);
+        ctx.lineTo(-14, 2);
+        ctx.lineTo(-6, 4);
+        ctx.closePath();
+        ctx.fill();
+
+        // 身体
+        ctx.fillStyle = "#7b1fa2";
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.ellipse(0, 1, 9, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#9c27b0";
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.ellipse(2, 3, 6, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 翼龙指（翅膀骨架线）
+        ctx.strokeStyle = "rgba(106, 27, 154, 0.7)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-2, -4);
+        ctx.lineTo(4, -18);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-2, -4);
+        ctx.lineTo(-6, -16);
+        ctx.stroke();
+
+        // 头颈
+        ctx.fillStyle = "#7b1fa2";
+        ctx.beginPath();
+        ctx.moveTo(6, -3);
+        ctx.lineTo(12, -8);
+        ctx.lineTo(18, -6);
+        ctx.lineTo(6, 1);
+        ctx.closePath();
+        ctx.fill();
+
+        // 喙（嘴）
+        ctx.fillStyle = "#ff8f00";
+        ctx.beginPath();
+        ctx.moveTo(10, -6);
+        ctx.lineTo(22, -4);
+        ctx.lineTo(10, -1);
+        ctx.closePath();
+        ctx.fill();
+
+        // 冠（头冠）
+        ctx.fillStyle = "#4a148c";
+        ctx.beginPath();
+        ctx.moveTo(10, -8);
+        ctx.lineTo(6, -16);
+        ctx.lineTo(4, -12);
+        ctx.lineTo(8, -7);
+        ctx.closePath();
+        ctx.fill();
+
+        // 翅膀（前层）
+        ctx.fillStyle = "rgba(156, 39, 176, 0.5)";
+        ctx.beginPath();
+        ctx.moveTo(-1, -4);
+        ctx.lineTo(8, -19);
+        ctx.lineTo(-8, -17);
+        ctx.lineTo(-5, -2);
+        ctx.closePath();
+        ctx.fill();
+
+        // 眼睛
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(11, -5, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#1a1a1a";
+        ctx.beginPath();
+        ctx.arc(11.5, -5, 1, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(11.8, -5.5, 0.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+      } else if (e.isFast) {
+        // 快速红怪 - 带火焰效果
+        // 尾
+        ctx.fillStyle = "#b71c1c";
+        ctx.beginPath();
+        ctx.moveTo(-10, -2);
+        ctx.lineTo(-18, -5);
+        ctx.lineTo(-10, 2);
+        ctx.closePath();
+        ctx.fill();
+        // 尾尖火焰
+        ctx.fillStyle = "#ff6f00";
+        ctx.beginPath();
+        ctx.moveTo(-16, -4);
+        ctx.lineTo(-22, -6);
+        ctx.lineTo(-18, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // 身体
+        ctx.fillStyle = "#c62828";
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 14, 9, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#e53935";
+        ctx.beginPath();
+        ctx.arc(-12, -2, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 嘴
+        ctx.fillStyle = "#b71c1c";
+        ctx.beginPath();
+        ctx.moveTo(8, -4);
+        ctx.lineTo(20, -1);
+        ctx.lineTo(8, 2);
+        ctx.fill();
+
+        // 牙齿
+        ctx.fillStyle = "#fff";
+        for (let i = 1; i <= 3; i++) {
+          ctx.beginPath();
+          ctx.moveTo(8 + i * 3, -2);
+          ctx.lineTo(8 + i * 3 + 2, -4);
+          ctx.lineTo(8 + i * 3 + 1, -1);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // 眼睛
+        ctx.fillStyle = "#ffeb3b";
+        ctx.beginPath();
+        ctx.arc(-8, -5, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#1a1a1a";
+        ctx.beginPath();
+        ctx.arc(-7.5, -5, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 背棘
+        ctx.fillStyle = "#d32f2f";
+        for (let i = -2; i <= 4; i += 3) {
+          ctx.beginPath();
+          ctx.moveTo(i, -8);
+          ctx.lineTo(i - 2, -14);
+          ctx.lineTo(i + 2, -14);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // 腿
+        ctx.fillStyle = "#8e0000";
+        ctx.fillRect(-5, 6, 3, 4);
+        ctx.fillRect(2, 6, 3, 4);
+      } else {
+        // 普通绿恐龙
+        // 尾
+        ctx.fillStyle = "#2e7d32";
+        ctx.beginPath();
+        ctx.moveTo(-12, -2);
+        ctx.lineTo(-22, -4);
+        ctx.lineTo(-12, 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#1b5e20";
+        ctx.beginPath();
+        ctx.moveTo(-20, -3);
+        ctx.lineTo(-24, -5);
+        ctx.lineTo(-20, 1);
+        ctx.closePath();
+        ctx.fill();
+
+        // 身体
+        ctx.fillStyle = "#2e7d32";
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 16, 11, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#43a047";
+        ctx.beginPath();
+        ctx.arc(-14, -3, 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 嘴
+        ctx.fillStyle = "#1b5e20";
+        ctx.beginPath();
+        ctx.moveTo(10, -5);
+        ctx.lineTo(22, -2);
+        ctx.lineTo(10, 2);
+        ctx.fill();
+
+        // 眼睛
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(-8, -6, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#1a1a1a";
+        ctx.beginPath();
+        ctx.arc(-7.5, -6, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(-7, -6.5, 0.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 背斑
+        ctx.fillStyle = "#66bb6a";
+        for (let i = -3; i <= 5; i += 4) {
+          ctx.beginPath();
+          ctx.arc(i, -9, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // 腿
+        ctx.fillStyle = "#1b5e20";
+        ctx.fillRect(-6, 8, 4, 4);
+        ctx.fillRect(3, 8, 4, 4);
+      }
+
+      ctx.restore();
+
+      const barW = 36;
+      const ratio = Math.max(0, e.hp / e.maxHp);
+      ctx.fillStyle = "rgba(0,0,0,.4)";
+      ctx.fillRect(e.x - barW / 2, e.y - 24, barW, 5);
+      if (e.isFlying) {
+        ctx.fillStyle = ratio > 0.35 ? "#ce93d8" : "#7b1fa2";
+      } else if (e.isFast) {
+        ctx.fillStyle = ratio > 0.35 ? "#ff8a65" : "#d32f2f";
+      } else {
+        ctx.fillStyle = ratio > 0.35 ? "#66bb6a" : "#ef5350";
+      }
+      ctx.fillRect(e.x - barW / 2, e.y - 24, barW * ratio, 5);
+    }
+
+    function drawTower(t) {
+      ctx.save();
+      ctx.translate(t.x, t.y);
+
+      const bw = 12;
+      const bh = 8;
+
+      const isLaser = t.type === "laser";
+      const isLightning = t.type === "lightning";
+
+      ctx.fillStyle = "#4e342e";
+      ctx.beginPath();
+      ctx.ellipse(0, bh + 2, bw, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (isLaser) {
+        const baseBright = Math.min(255, 30 + t.level * 3);
+        ctx.fillStyle = `rgb(${Math.floor(baseBright * 0.2)}, ${Math.floor(baseBright * 0.6)}, ${Math.floor(baseBright * 0.9)})`;
+        ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
+        const roofBright = Math.min(255, 50 + t.level * 4);
+        ctx.fillStyle = `rgb(${Math.floor(roofBright * 0.15)}, ${Math.floor(roofBright * 0.5)}, ${Math.floor(roofBright * 0.95)})`;
+        ctx.beginPath();
+        ctx.moveTo(0, -bh);
+        ctx.lineTo(bw + 4, -bh - 10);
+        ctx.lineTo(-bw - 4, -bh - 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = `hsl(195, 100%, ${Math.min(85, 55 + t.level * 2)}%)`;
+        ctx.beginPath();
+        ctx.arc(0, -bh - 10, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#00bcd4";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      } else if (isLightning) {
+        const baseBright = Math.min(255, 40 + t.level * 3);
+        ctx.fillStyle = `rgb(${Math.floor(baseBright * 0.95)}, ${Math.floor(baseBright * 0.7)}, ${Math.floor(baseBright * 0.1)})`;
+        ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
+        const roofBright = Math.min(255, 60 + t.level * 4);
+        ctx.fillStyle = `rgb(${Math.floor(roofBright)}, ${Math.floor(roofBright * 0.8)}, ${Math.floor(roofBright * 0.15)})`;
+        ctx.beginPath();
+        ctx.moveTo(0, -bh);
+        ctx.lineTo(bw + 4, -bh - 10);
+        ctx.lineTo(2, -bh - 6);
+        ctx.lineTo(bw, -bh - 18);
+        ctx.lineTo(-bw - 4, -bh - 10);
+        ctx.lineTo(-2, -bh - 6);
+        ctx.lineTo(-bw, -bh - 18);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = `hsl(45, 100%, ${Math.min(90, 60 + t.level * 2)}%)`;
+        ctx.beginPath();
+        ctx.arc(0, -bh - 10, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowColor = "#ffd600";
+        ctx.shadowBlur = 12;
+        ctx.strokeStyle = "#ffd600";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#fff8e1";
+        ctx.font = "bold 9px Microsoft YaHei";
+        ctx.textAlign = "center";
+        ctx.fillText("⚡", 0, -bh - 6);
+      } else {
+        const baseBright = Math.min(255, 93 + t.level * 3);
+        ctx.fillStyle = `rgb(${Math.floor(baseBright * 0.7)}, ${Math.floor(baseBright * 0.5)}, ${Math.floor(baseBright * 0.3)})`;
+        ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
+        const roofBright = Math.min(255, 141 + t.level * 4);
+        ctx.fillStyle = `rgb(${Math.floor(roofBright * 0.7)}, ${Math.floor(roofBright * 0.55)}, ${Math.floor(roofBright * 0.35)})`;
+        ctx.beginPath();
+        ctx.moveTo(0, -bh);
+        ctx.lineTo(bw + 4, -bh - 10);
+        ctx.lineTo(-bw - 4, -bh - 10);
+        ctx.closePath();
+        ctx.fill();
+        const hue = Math.min(55, 45 + t.level * 1.5);
+        ctx.fillStyle = `hsl(${hue}, 100%, ${Math.min(80, 60 + t.level)}%)`;
+        ctx.beginPath();
+        ctx.arc(0, -bh - 10, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#f57f17";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      ctx.restore();
+
+      if (t.upgradedAt) {
+        const elapsed = performance.now() - t.upgradedAt;
+        if (elapsed < 400) {
+          const flashAlpha = 0.5 * (1 - elapsed / 400);
+          ctx.fillStyle = `rgba(255, 215, 0, ${flashAlpha})`;
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, 20, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          delete t.upgradedAt;
+        }
+      }
+
+      if (hoveredTower === t) {
+        ctx.strokeStyle = "rgba(255, 215, 0, 0.6)";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, 24 + Math.sin(Date.now() / 300) * 3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      const range = towerRange(t);
+      const rangeAlpha = 0.15 + Math.min(0.35, t.level * 0.012);
+      ctx.strokeStyle = isLightning
+        ? `rgba(255, 215, 0, ${rangeAlpha * 1.4})`
+        : isLaser
+        ? `rgba(0, 200, 255, ${rangeAlpha * 1.2})`
+        : `rgba(255,255,255,${rangeAlpha})`;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, range, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 12px Microsoft YaHei";
+      ctx.textAlign = "center";
+      ctx.strokeStyle = isLightning ? "#f57f17" : isLaser ? "#006064" : "#33691e";
+      ctx.lineWidth = 3;
+      const label = isLightning ? "雷塔" : isLaser ? "激光" : "Lv.";
+      const labelText = label + t.level;
+      ctx.strokeText(labelText, t.x, t.y + 24);
+      ctx.fillText(labelText, t.x, t.y + 24);
+
+      const assistProgress = t.assists % ASSISTS_PER_LEVEL;
+      if (assistProgress > 0) {
+        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        ctx.font = "9px Microsoft YaHei";
+        ctx.strokeStyle = "rgba(0,0,0,0.4)";
+        ctx.lineWidth = 2;
+        ctx.strokeText("助" + assistProgress + "/" + ASSISTS_PER_LEVEL, t.x, t.y + 38);
+        ctx.fillText("助" + assistProgress + "/" + ASSISTS_PER_LEVEL, t.x, t.y + 38);
+      }
+
+      if (t.level < MAX_TOWER_LEVEL && gold >= UPGRADE_COST) {
+        ctx.fillStyle = "rgba(255, 215, 0, 0.85)";
+        ctx.font = "10px Microsoft YaHei";
+        ctx.strokeStyle = "rgba(0,0,0,0.5)";
+        ctx.lineWidth = 2;
+        ctx.strokeText("+" + UPGRADE_COST + "g", t.x, t.y - 28);
+        ctx.fillText("+" + UPGRADE_COST + "g", t.x, t.y - 28);
+      } else if (t.level >= MAX_TOWER_LEVEL) {
+        ctx.fillStyle = "rgba(255, 100, 100, 0.8)";
+        ctx.font = "10px Microsoft YaHei";
+        ctx.strokeStyle = "rgba(0,0,0,0.5)";
+        ctx.lineWidth = 2;
+        ctx.strokeText("MAX", t.x, t.y - 28);
+        ctx.fillText("MAX", t.x, t.y - 28);
+      }
+    }
+
+    function drawTrap(t) {
+      const cx = t.gx * CELL + CELL / 2;
+      const cy = t.gy * CELL + CELL / 2;
+      if (t.type === "spike") {
+        const n = 3 + Math.min(6, t.level);
+        for (let i = 0; i < n; i++) {
+          const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
+          ctx.fillStyle = t.level > 1 ? `hsl(25, ${50 + t.level * 3}%, ${30 + t.level * 1.5}%)` : "#5d4037";
+          ctx.beginPath();
+          ctx.moveTo(cx + Math.cos(angle) * 6, cy + Math.sin(angle) * 6);
+          ctx.lineTo(cx + Math.cos(angle + 0.4) * 12, cy + Math.sin(angle + 0.4) * 12);
+          ctx.lineTo(cx + Math.cos(angle - 0.4) * 12, cy + Math.sin(angle - 0.4) * 12);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.fillStyle = "#4e342e";
+        ctx.beginPath();
+        ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+        ctx.fill();
+        if (t.level > 1) {
+          ctx.fillStyle = "#fff";
+          ctx.font = "bold 8px Microsoft YaHei";
+          ctx.textAlign = "center";
+          ctx.fillText("Lv" + t.level, cx, cy + 18);
+        }
+        if (t.upgradedAt) {
+          const elapsed = performance.now() - t.upgradedAt;
+          if (elapsed < 400) {
+            ctx.fillStyle = `rgba(255, 215, 0, ${0.5 * (1 - elapsed / 400)})`;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 16, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            t.upgradedAt = 0;
+          }
+        }
+      } else if (t.type === "trap") {
+        ctx.strokeStyle = "#78909c";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(cx - 4, cy, 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx + 4, cy, 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = "#546e7a";
+        ctx.beginPath();
+        ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (t.type === "net") {
+        ctx.strokeStyle = "#42a5f5";
+        ctx.lineWidth = 1.5;
+        for (let i = -6; i <= 6; i += 4) {
+          ctx.beginPath();
+          ctx.moveTo(cx + i, cy - 8);
+          ctx.lineTo(cx + i, cy + 8);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(cx - 8, cy + i);
+          ctx.lineTo(cx + 8, cy + i);
+          ctx.stroke();
+        }
+        ctx.strokeStyle = "#1e88e5";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 9, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = "#42a5f5";
+        ctx.font = "bold 9px Microsoft YaHei";
+        ctx.textAlign = "center";
+        ctx.fillText("网", cx, cy + 4);
+      } else if (t.type === "mine") {
+        ctx.fillStyle = "#37474f";
+        ctx.beginPath();
+        ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#ff8a65";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.fillStyle = "#ff8a65";
+        ctx.font = "bold 10px Microsoft YaHei";
+        ctx.textAlign = "center";
+        ctx.fillText("雷", cx, cy + 4);
+      }
+    }
+
+    function gameLoop(ts) {
+      if (gameLost || gameWon) return;
+
+      if (prevFrameTs === 0) {
+        prevFrameTs = ts;
+        requestAnimationFrame(gameLoop);
+        return;
+      }
+      const rawDt = ts - prevFrameTs;
+      prevFrameTs = ts;
+      const dt = Math.min(50, rawDt > 0 ? rawDt : 16);
+
+      spawnTimer += rawDt;
+      const spawnEvery = Math.max(800, (2200 - wave * 120) * spawnSpeedFactor);
+      if (spawnedThisWave < toSpawnThisWave && spawnTimer >= spawnEvery) {
+        spawnTimer = 0;
+        spawnEnemy();
+        spawnedThisWave++;
+      }
+      if (spawnedThisWave >= toSpawnThisWave && enemies.length === 0) {
+        if (DINO_HP + extraDinoSpawnHp >= DINO_HP_MAX) {
+          gameWon = true;
+          showVictory();
+          return;
+        }
+        wave++;
+        spawnSpeedFactor *= 0.9;
+        toSpawnThisWave = baseSpawnForWave(wave) + spawnBonus;
+        spawnedThisWave = 0;
+        spawnTimer = spawnEvery;
+        gold += 300;
+      }
+
+      difficultyTimer += rawDt;
+      while (difficultyTimer >= DINO_HP_BOOST_EVERY_MS) {
+        difficultyTimer -= DINO_HP_BOOST_EVERY_MS;
+        spawnBonus++;
+        toSpawnThisWave++;
+        const currentSpawnHp = DINO_HP + extraDinoSpawnHp;
+        let hpMultiplier;
+        if (currentSpawnHp < 1000) {
+          hpMultiplier = 1.5;
+        } else if (currentSpawnHp < 10000) {
+          hpMultiplier = 1.4;
+        } else {
+          hpMultiplier = 1.1;
+        }
+        extraDinoSpawnHp = Math.min(
+          DINO_HP_MAX - DINO_HP,
+          Math.round(currentSpawnHp * hpMultiplier) - DINO_HP
+        );
+      }
+
+      for (const e of enemies) {
+        e.prevGx = Math.floor(e.x / CELL);
+        e.prevGy = Math.floor(e.y / CELL);
+        updateEnemy(e, dt);
+        if (e.touchedCarrot) gameLost = true;
+      }
+
+      enemies = enemies.filter((e) => e.hp > 0);
+
+      // ========== 陷阱触发逻辑 ==========
+      for (const e of enemies) {
+        e.destroyedByMine = false; // 每帧重置，使多个地雷可跨帧触发
+        const egx = Math.floor(e.x / CELL);
+        const egy = Math.floor(e.y / CELL);
+        const checkCells = [];
+        if (e.prevGx !== undefined && (e.prevGx !== egx || e.prevGy !== egy)) {
+          const steps = Math.max(Math.abs(egx - e.prevGx), Math.abs(egy - e.prevGy));
+          for (let s = 0; s <= steps; s++) {
+            const t = steps === 0 ? 0 : s / steps;
+            checkCells.push({
+              gx: Math.round(e.prevGx + (egx - e.prevGx) * t),
+              gy: Math.round(e.prevGy + (egy - e.prevGy) * t)
+            });
+          }
+        } else {
+          checkCells.push({ gx: egx, gy: egy });
+        }
+        for (const cell of checkCells) {
+          const trap = trapAt(cell.gx, cell.gy);
+          if (!trap) continue;
+          if (trap.type === "spike") {
+            trap.cooldown = Math.max(0, trap.cooldown - dt);
+            if (trap.cooldown <= 0) {
+              trap.cooldown = SPIKE_COOLDOWN_MS;
+              e.hp -= trapDamage(trap);
+              trap.damagedBy.add(trap);
+              if (e.hp <= 0) {
+                processSpikeKill(e, trap);
+                e.hp = 0;
+              }
+            }
+          } else if (trap.type === "trap") {
+            if (!e.isFlying && !e.snaredTimer) {
+              e.snaredTimer = 5000;
+            }
+          } else if (trap.type === "net") {
+            if (e.isFlying && !e.snaredTimer) {
+              e.snaredTimer = 5000;
+            }
+          } else if (trap.type === "mine") {
+            if (e.destroyedByMine) continue;
+            e.hp -= Math.round(e.maxHp * 0.1);
+            e.destroyedByMine = true;
+            if (e.hp <= 0) {
+              e.dead = true;
+              gold += GOLD_PER_KILL * (e.isFast || e.isFlying ? 3 : 1);
+            }
+            traps = traps.filter(t => t !== trap);
+          }
+        }
+      }
+      enemies = enemies.filter((e) => e.hp > 0);
+
+      if (!gameLost) {
+        for (const t of towers) {
+          t.cooldown = Math.max(0, t.cooldown - dt);
+          const target = nearestEnemyInRange(t);
+          if (target && t.cooldown <= 0) {
+            t.cooldown = FIRE_COOLDOWN_MS;
+            if (t.type === "laser") {
+              target.hp -= towerAttackDamage(t);
+              target.damagedBy.add(t);
+              laserBeams.push({ x1: t.x, y1: t.y, x2: target.x, y2: target.y, createdAt: performance.now() });
+              if (target.hp <= 0) {
+                processDeath(target, t);
+                target.hp = 0;
+              }
+            } else if (t.type === "lightning") {
+              target.hp -= towerAttackDamage(t);
+              target.damagedBy.add(t);
+              lightningBolts.push({ x1: t.x, y1: t.y, x2: target.x, y2: target.y, createdAt: performance.now() });
+              if (target.hp <= 0) {
+                processDeath(target, t);
+                target.hp = 0;
+              }
+            } else {
+              const ang = Math.atan2(target.y - t.y, target.x - t.x);
+              bullets.push({
+                x: t.x,
+                y: t.y,
+                vx: Math.cos(ang) * BULLET_SPEED,
+                vy: Math.sin(ang) * BULLET_SPEED,
+                damage: towerAttackDamage(t),
+                owner: t,
+                target,
+              });
+            }
+          }
+        }
+
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          const b = bullets[i];
+          b.x += b.vx * (dt / 16);
+          b.y += b.vy * (dt / 16);
+          if (b.x < -20 || b.x > canvas.width + 20 || b.y < -20 || b.y > canvas.height + 20) {
+            bullets.splice(i, 1);
+            continue;
+          }
+          if (!enemies.includes(b.target)) {
+            bullets.splice(i, 1);
+            continue;
+          }
+          if (dist(b, b.target) < 16) {
+            b.target.hp -= b.damage;
+            if (b.target.hp <= 0) {
+              processDeath(b.target, b.owner);
+            } else {
+              b.target.damagedBy.add(b.owner);
+            }
+            bullets.splice(i, 1);
+          }
+        }
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawGrid();
+      drawStart();
+      drawCarrot();
+
+      // Hover highlight
+      if (mouseCell && !gameLost) {
+        const { gx, gy } = mouseCell;
+        const existingTower = towers.find(t => t.gx === gx && t.gy === gy);
+        const existingTrap = traps.find(t => t.gx === gx && t.gy === gy);
+
+        if (selectedTool === "remove") {
+          if (existingTower || existingTrap) {
+            ctx.fillStyle = "rgba(198, 40, 40, 0.3)";
+            ctx.fillRect(gx * CELL, gy * CELL, CELL, CELL);
+            ctx.strokeStyle = "rgba(198, 40, 40, 0.9)";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(gx * CELL, gy * CELL, CELL, CELL);
+            ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+            ctx.font = "bold 11px Microsoft YaHei";
+            ctx.textAlign = "center";
+            ctx.fillText("点击拆除", gx * CELL + CELL / 2, gy * CELL + CELL / 2 + 4);
+          }
+        } else {
+          const isTowerTool = selectedTool === "normal" || selectedTool === "laser" || selectedTool === "lightning";
+        if (isTowerTool) {
+          if (existingTower && existingTower.level < MAX_TOWER_LEVEL && gold >= UPGRADE_COST) {
+            ctx.fillStyle = "rgba(255, 215, 0, 0.25)";
+            ctx.fillRect(gx * CELL, gy * CELL, CELL, CELL);
+            ctx.strokeStyle = "rgba(255, 215, 0, 0.8)";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(gx * CELL, gy * CELL, CELL, CELL);
+            ctx.fillStyle = "rgba(255, 215, 0, 0.95)";
+            ctx.font = "bold 11px Microsoft YaHei";
+            ctx.textAlign = "center";
+            ctx.fillText("点击升级", gx * CELL + CELL / 2, gy * CELL + CELL / 2 + 4);
+          } else if (!existingTower && gold >= towerCost(selectedTool) && canPlaceTowerAt(gx, gy)) {
+            const cost = towerCost(selectedTool);
+            const color = selectedTool === "laser" ? "0, 150, 255" : selectedTool === "lightning" ? "255, 215, 0" : "102, 187, 106";
+            const label = selectedTool === "laser" ? "激光塔" : selectedTool === "lightning" ? "雷电塔" : "炮塔";
+            ctx.fillStyle = `rgba(${color}, 0.25)`;
+            ctx.fillRect(gx * CELL, gy * CELL, CELL, CELL);
+            ctx.strokeStyle = `rgba(${color}, 0.8)`;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(gx * CELL, gy * CELL, CELL, CELL);
+            ctx.fillStyle = `rgba(${color}, 0.95)`;
+            ctx.font = "bold 10px Microsoft YaHei";
+            ctx.textAlign = "center";
+            ctx.fillText(label + cost + "g", gx * CELL + CELL / 2, gy * CELL + CELL / 2 + 4);
+          } else if (existingTower && (existingTower.level >= MAX_TOWER_LEVEL || gold < UPGRADE_COST)) {
+            ctx.fillStyle = "rgba(239, 83, 80, 0.18)";
+            ctx.fillRect(gx * CELL, gy * CELL, CELL, CELL);
+            ctx.strokeStyle = "rgba(239, 83, 80, 0.6)";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(gx * CELL, gy * CELL, CELL, CELL);
+          }
+        } else {
+          const cost = selectedTool === "mine" ? MINE_COST : selectedTool === "trap" ? TRAP_COST : selectedTool === "net" ? NET_COST : SPIKE_COST;
+          const labels = { spike: "地刺" + SPIKE_COST + "g", trap: "夹子" + TRAP_COST + "g", net: "飞网" + NET_COST + "g", mine: "地雷" + MINE_COST + "g" };
+          if (canPlaceTrapAt(gx, gy) && gold >= cost) {
+            ctx.fillStyle = "rgba(255, 152, 0, 0.25)";
+            ctx.fillRect(gx * CELL, gy * CELL, CELL, CELL);
+            ctx.strokeStyle = "rgba(255, 152, 0, 0.8)";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(gx * CELL, gy * CELL, CELL, CELL);
+            ctx.fillStyle = "rgba(255, 152, 0, 0.95)";
+            ctx.font = "bold 10px Microsoft YaHei";
+            ctx.textAlign = "center";
+            ctx.fillText(labels[selectedTool], gx * CELL + CELL / 2, gy * CELL + CELL / 2 + 4);
+          }
+        }
+      }
+      }
+      for (const t of towers) drawTower(t);
+      for (const t of traps) drawTrap(t);
+      for (const e of enemies) drawDino(e);
+      const now = performance.now();
+      for (let i = laserBeams.length - 1; i >= 0; i--) {
+        const bm = laserBeams[i];
+        const age = now - bm.createdAt;
+        if (age > 150) { laserBeams.splice(i, 1); continue; }
+        const alpha = 1 - age / 150;
+        ctx.save();
+        ctx.strokeStyle = `rgba(0, 200, 255, ${alpha * 0.3})`;
+        ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+        ctx.strokeStyle = `rgba(200, 240, 255, ${alpha * 0.9})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+        ctx.restore();
+      }
+      for (let i = lightningBolts.length - 1; i >= 0; i--) {
+        const bm = lightningBolts[i];
+        const age = now - bm.createdAt;
+        if (age > 200) { lightningBolts.splice(i, 1); continue; }
+        const alpha = 1 - age / 200;
+        ctx.save();
+        const segments = 6;
+        const dx = (bm.x2 - bm.x1) / segments;
+        const dy = (bm.y2 - bm.y1) / segments;
+        ctx.strokeStyle = `rgba(255, 215, 0, ${alpha * 0.4})`;
+        ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1);
+        for (let s = 0; s < segments; s++) {
+          const t1 = s + 1;
+          ctx.lineTo(bm.x1 + dx * t1 + (Math.random() - 0.5) * 14, bm.y1 + dy * t1 + (Math.random() - 0.5) * 14);
+        }
+        ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+        ctx.strokeStyle = `rgba(255, 255, 200, ${alpha * 0.9})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1);
+        for (let s = 0; s < segments; s++) {
+          const t1 = s + 1;
+          ctx.lineTo(bm.x1 + dx * t1 + (Math.random() - 0.5) * 14, bm.y1 + dy * t1 + (Math.random() - 0.5) * 14);
+        }
+        ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+        ctx.restore();
+      }
+      for (const b of bullets) {
+        ctx.fillStyle = "#ffeb3b";
+        ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#f57f17"; ctx.lineWidth = 2; ctx.stroke();
+      }
+
+      document.getElementById("carrotTag").textContent = gameLost ? "萝卜：被吃了！" : "萝卜：安全";
+      const costLabel = { normal: "30", laser: "60", lightning: "100" };
+      document.getElementById("goldTag").textContent = "金币：" + gold;
+      document.getElementById("waveTag").textContent = "波次：" + wave;
+      document.getElementById("diffTag").textContent =
+        "10秒难度：新兵多" + extraDinoSpawnHp + "血 · 每波多" + spawnBonus + "只";
+
+      // 工具栏状态
+      for (const btn of document.querySelectorAll(".toolbtn")) {
+        btn.classList.toggle("active", btn.dataset.tool === selectedTool);
+      }
+
+      if (!gameLost) {
+        requestAnimationFrame(gameLoop);
+      } else {
+        ctx.fillStyle = "rgba(0,0,0,.6)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#ffccbc";
+        ctx.font = "bold 28px Microsoft YaHei";
+        ctx.textAlign = "center";
+        ctx.fillText("萝卜被恐龙碰到了！", canvas.width / 2, canvas.height / 2 - 10);
+        ctx.fillStyle = "#fff";
+        ctx.font = "16px Microsoft YaHei";
+        ctx.fillText("游戏失败 · 刷新页面再玩", canvas.width / 2, canvas.height / 2 + 28);
+      }
+    }
+
+    function towerCost(tool) {
+      if (tool === "laser") return LASER_TOWER_COST;
+      if (tool === "lightning") return LIGHTNING_TOWER_COST;
+      return TOWER_COST;
+    }
+
+    function handleCellClick(gx, gy) {
+      if (selectedTool === "remove") {
+        const tw = towers.find(t => t.gx === gx && t.gy === gy);
+        if (tw) { removeTowerAt(gx, gy); return; }
+        const tr = traps.find(t => t.gx === gx && t.gy === gy);
+        if (tr) { removeTrapAt(gx, gy); return; }
+      } else if (selectedTool === "laser") {
+        const existing = towers.find(t => t.gx === gx && t.gy === gy);
+        if (existing) upgradeTower(existing);
+        else placeLaserTower(gx, gy);
+      } else if (selectedTool === "lightning") {
+        const existing = towers.find(t => t.gx === gx && t.gy === gy);
+        if (existing) upgradeTower(existing);
+        else placeLightningTower(gx, gy);
+      } else if (selectedTool === "normal") {
+        const existing = towers.find(t => t.gx === gx && t.gy === gy);
+        if (existing) upgradeTower(existing);
+        else placeTower(gx, gy);
+      } else {
+        // traps
+        const clickedSpike = traps.find(t => t.gx === gx && t.gy === gy && t.type === "spike");
+        if (clickedSpike) upgradeTrap(clickedSpike);
+        else placeTrap(gx, gy, selectedTool);
+      }
+    }
+
+    function getCanvasXY(clientX, clientY) {
+      const r = canvas.getBoundingClientRect();
+      const sx = canvas.width / r.width;
+      const sy = canvas.height / r.height;
+      return {
+        px: (clientX - r.left) * sx,
+        py: (clientY - r.top) * sy
+      };
+    }
+
+    canvas.addEventListener("click", (ev) => {
+      const { px, py } = getCanvasXY(ev.clientX, ev.clientY);
+      handleCellClick(Math.floor(px / CELL), Math.floor(py / CELL));
+    });
+
+    canvas.addEventListener("touchstart", (ev) => {
+      ev.preventDefault();
+      const t = ev.touches[0];
+      const { px, py } = getCanvasXY(t.clientX, t.clientY);
+      handleCellClick(Math.floor(px / CELL), Math.floor(py / CELL));
+    }, { passive: false });
+
+    canvas.addEventListener("mousemove", (ev) => {
+      const r = canvas.getBoundingClientRect();
+      const sx = canvas.width / r.width;
+      const sy = canvas.height / r.height;
+      const px = (ev.clientX - r.left) * sx;
+      const py = (ev.clientY - r.top) * sy;
+      const gx = Math.floor(px / CELL);
+      const gy = Math.floor(py / CELL);
+      if (gx >= 0 && gx < COLS && gy >= 0 && gy < ROWS) {
+        mouseCell = { gx, gy };
+        hoveredTower = towers.find(t => t.gx === gx && t.gy === gy) || null;
+      } else {
+        mouseCell = null;
+        hoveredTower = null;
+      }
+    });
+
+    canvas.addEventListener("mouseleave", () => {
+      mouseCell = null;
+      hoveredTower = null;
+    });
+
+    document.addEventListener("keydown", (ev) => {
+      const keyMap = {
+        "1": "normal", "2": "laser", "3": "lightning",
+        "4": "spike", "5": "trap", "6": "net", "7": "mine", "8": "remove",
+        "Escape": "normal"
+      };
+      if (keyMap[ev.key]) selectedTool = keyMap[ev.key];
+    });
+
+    // Toolbar buttons via data-tool
+    document.getElementById("toolbar").addEventListener("click", (ev) => {
+      const btn = ev.target.closest(".toolbtn");
+      if (btn) selectedTool = btn.dataset.tool;
+    });
+
+    // ========== 胜利系统 ==========
+    function getWinners() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch { return []; }
+    }
+
+    function saveWinner(name) {
+      const winners = getWinners();
+      winners.unshift({ name: name.trim(), date: new Date().toLocaleDateString("zh-CN") });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(winners));
+    }
+
+    function renderWinners() {
+      const list = document.getElementById("winnerList");
+      const winners = getWinners();
+      if (winners.length === 0) { list.innerHTML = ""; return; }
+      list.innerHTML = "<h3>通关记录</h3>" +
+        winners.map(w =>
+          `<div class="winner-item"><span class="winner-name">${escHtml(w.name)}</span><span class="winner-date">${w.date}</span></div>`
+        ).join("");
+    }
+
+    function escHtml(s) {
+      const d = document.createElement("div");
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function showVictory() {
+      document.getElementById("victoryOverlay").classList.add("show");
+      renderWinners();
+      const input = document.getElementById("nameInput");
+      input.value = "";
+      input.focus();
+    }
+
+    document.getElementById("submitBtn").addEventListener("click", () => {
+      const input = document.getElementById("nameInput");
+      const btn = document.getElementById("submitBtn");
+      const name = input.value.trim();
+      if (!name) { input.focus(); return; }
+      saveWinner(name);
+      renderWinners();
+      input.disabled = true;
+      btn.disabled = true;
+      btn.textContent = "已记录";
+      input.value = name;
+    });
+
+    document.getElementById("nameInput").addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") document.getElementById("submitBtn").click();
+    });
+
+    document.getElementById("clearBtn").addEventListener("click", () => {
+      localStorage.removeItem(STORAGE_KEY);
+      renderWinners();
+      const input = document.getElementById("nameInput");
+      input.disabled = false;
+      input.value = "";
+      document.getElementById("submitBtn").disabled = false;
+      document.getElementById("submitBtn").textContent = "提交记录";
+    });
+
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>
